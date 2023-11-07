@@ -53,8 +53,22 @@ class ShapeRenderMetrics(Loss):
 
         # normal
         h, w, _ = rgb_pr.shape
-        normal = color_map_backward(data_pr['normal'].detach().cpu().numpy())  # h,w,3
-        imgs.append(normal.reshape([h,w,3]))
+        
+        normal = data_pr['normal'].reshape([h,w,3]).detach().cpu().numpy() *2-1 # h,w,3
+
+        normal_d = normal.copy()
+        normal = normal_d.reshape([h,w,3,-1])
+
+        rot =np.linalg.inv(data_pr['pose'][0,:3,:3].T.detach().cpu().numpy())
+        normal = np.matmul(rot[None,...], normal[:,:,None]).reshape([h,w,3])
+        normal_c = normal.copy()
+        normal_c[...,0] = -normal[...,0]
+        normal_c[...,1] = normal[...,1]
+        normal_c[...,2] = -normal[...,2]
+        normal_c = (normal_c+1)/2
+
+
+        imgs.append(color_map_backward(normal_c))
 
         if 'human_light' in data_pr:
             imgs.append(process_key_img(data_pr['human_light'], h, w))
@@ -68,6 +82,8 @@ class ShapeRenderMetrics(Loss):
         model_name=kwargs['model_name']
         output_path = Path(f'data/train_vis/{model_name}')
         output_path.mkdir(exist_ok=True, parents=True)
+        imsave(f'{str(output_path)}/{step}-normal-{data_index}.jpg',color_map_backward(normal_c))
+
         imsave(f'{str(output_path)}/{step}-index-{data_index}.jpg', concat_images_list(*imgs, vert=True))
         return outputs
 

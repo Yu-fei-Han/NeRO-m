@@ -13,9 +13,36 @@ from colmap.read_write_model import read_model
 from utils.base_utils import resize_img, read_pickle, project_points, save_pickle, pose_inverse, \
     mask_depth_to_pts, pose_apply
 import open3d as o3d
-
+import cv2
 from utils.pose_utils import look_at_crop
+# This function is borrowed from IDR: https://github.com/lioryariv/idr
+def load_K_Rt_from_P(filename, P=None):
+    if P is None:
+        lines = open(filename).read().splitlines()
+        if len(lines) == 4:
+            lines = lines[1:]
+        lines = [[x[0], x[1], x[2], x[3]] for x in (x.split(" ") for x in lines)]
+        P = np.asarray(lines).astype(np.float32).squeeze()
 
+    out = cv2.decomposeProjectionMatrix(P)
+    K = out[0]
+    R = out[1]
+    c = out[2]
+    c = c[:3] / c[3]
+    t = -R @ c
+
+    K = K / K[2, 2]
+    intrinsics = np.eye(4)
+    intrinsics[:3, :3] = K
+
+    pose = np.eye(4, dtype=np.float32)
+    
+    # A =np.array([[-1,0,0],[0,1,0],[0,0,-1]])
+    # R =  R@A
+    pose[:3, :3] = R
+    pose[:3, 3] = t[:,0]
+
+    return intrinsics, pose
 
 class BaseDatabase(abc.ABC):
     def __init__(self, database_name):
@@ -255,7 +282,70 @@ class GlossySyntheticDatabase(BaseDatabase):
 
     def get_mask(self, img_id):
         raise NotImplementedError
+    
+class Ourdatabase(BaseDatabase):
+    def __init__(self, database_name):
+        super().__init__(database_name)
+        _, model_name = database_name.split('/')
+        RENDER_ROOT='data/ours'
+        self.root=f'{RENDER_ROOT}/{model_name}'
+        self.img_path = sorted(glob.glob(f'{self.root}/image/*.png')+glob.glob(f'{self.root}/image/*.jpg'))
+        self.img_num = len(self.img_path)
+        self.img_ids= [str(k) for k in range(self.img_num)]
+        self.camera_dict = np.load(os.path.join(self.root, 'cameras.npz'))
+        self.world_mats_np = [self.camera_dict['world_mat_%d' % int(idx)].astype(np.float32) for idx in range(self.img_num)]
+        self.scale_mats_np = [self.camera_dict['scale_mat_%d' % int(idx)].astype(np.float32) for idx in range(self.img_num)]
+        self.intrinsics_all = []
+        self.pose_all = []
+        for scale_mat, world_mat in zip(self.scale_mats_np, self.world_mats_np):
+            P = world_mat @ scale_mat
+            P = P[:3, :4]
+            intrinsics, pose = load_K_Rt_from_P(None, P)
+            self.intrinsics_all.append(intrinsics)
 
+
+            self.pose_all.append(pose)
+
+        img = imread(self.img_path[0])
+        self.h, self.w, _ = np.shape(img)
+        del img
+
+
+    def get_image(self, img_id):
+        return imread(self.img_path[int(img_id)])[...,:3]
+
+    def get_K(self, img_id):
+        K = self.intrinsics_all[int(img_id)][:3,:3]
+        return K.astype(np.float32)
+
+    def get_pose(self, img_id):
+        pose = self.pose_all[int(img_id)][:3,:]
+        return pose
+
+    def get_img_ids(self):
+        return self.img_ids
+
+    def get_depth(self, img_id):
+        img = self.get_image(img_id)
+        h, w, _ = img.shape
+        return np.ones([h,w],np.float32), np.ones([h, w]).astype(bool)
+
+    def get_mask(self, img_id):
+
+        mask = cv2.imread(f"{self.root}/input_azimuth_maps/"+"{:04d}.png".format(int(img_id)),-1)[...,-1:]
+        return mask
+    
+    def get_azimuth(self, img_id):
+        azimuth = cv2.imread(f"{self.root}/input_azimuth_maps/"+"{:04d}.png".format(int(img_id)),-1)[...,:1]
+        azimuth = azimuth/65535
+        return azimuth
+
+    def get_camera_center(self, img_id):
+        pose = self.pose_all[int(img_id)][:3,:]
+        rays_o = pose[ :, :3].T @ -pose[ :, 3:]
+        return rays_o
+
+    
 class CustomDatabase(BaseDatabase):
     def __init__(self, database_name):
         super().__init__(database_name)
@@ -403,6 +493,7 @@ def parse_database_name(database_name:str)->BaseDatabase:
         'syn': GlossySyntheticDatabase,
         'real': GlossyRealDatabase,
         'custom': CustomDatabase,
+        'ours': Ourdatabase
     }
     database_type = database_name.split('/')[0]
     if database_type in name2database:
@@ -414,9 +505,9 @@ def get_database_split(database: BaseDatabase, split_type='validation'):
     if split_type=='validation':
         random.seed(6033)
         img_ids = database.get_img_ids()
-        random.shuffle(img_ids)
-        test_ids = img_ids[:1]
-        train_ids = img_ids[1:]
+        # random.shuffle(img_ids)
+        test_ids = img_ids[-1:]
+        train_ids = img_ids[:]
     elif split_type=='test':
         test_ids, train_ids = read_pickle('configs/synthetic_split_128.pkl')
     else:

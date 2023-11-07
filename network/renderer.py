@@ -307,7 +307,7 @@ class NeROShapeRenderer(nn.Module):
         outputs['loss_rgb'] = self.compute_rgb_loss(outputs['ray_rgb'], ray_batch['rgbs'])
         outputs['gt_rgb'] = ray_batch['rgbs'].reshape(h, w, 3)
         outputs['ray_rgb'] = outputs['ray_rgb'].reshape(h, w, 3)
-
+        outputs['pose'] = input_poses
         # used in evaluation
         outputs['gt_depth'] = gt_depth.unsqueeze(-1)
         outputs['gt_mask'] = gt_mask.unsqueeze(-1)
