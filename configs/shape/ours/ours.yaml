@@ -1,8 +1,8 @@
-name: 25_clip_shape
+name: 26_clip_shape
 
 ####network#####
 network: shape
-database_name: ours/25_clip
+database_name: ours_data/26_clip
 apply_occ_loss: true
 occ_loss_step: 20000
 
@@ -16,13 +16,13 @@ freeze_inv_s_step: 15000
 ####dataset#####
 train_dataset_type: dummy
 train_dataset_cfg:
-  database_name: ours/25_clip
+  database_name: ours_data/26_clip
 val_set_list:
   -
     name: val
     type: dummy
     cfg:
-      database_name: ours/25_clip
+      database_name: ours_data/25_clip
 
 ####trainier####
 optimizer_type: adam
