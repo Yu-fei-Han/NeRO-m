@@ -1,10 +1,8 @@
-name: vase_shape
+name: vase
 
 ####network#####
 network: shape
-database_name: real/vase/raw_1024
-shader_config:
-  human_light: true
+database_name: /openbayess/input/input0/vase
 apply_occ_loss: true
 occ_loss_step: 20000
 
@@ -18,19 +16,19 @@ freeze_inv_s_step: 15000
 ####dataset#####
 train_dataset_type: dummy
 train_dataset_cfg:
-  database_name: real/vase/raw_1024
+  database_name: /openbayess/input/input0/vase
 val_set_list:
   -
     name: val
     type: dummy
     cfg:
-      database_name: real/vase/raw_1024
+      database_name: /openbayess/input/input0/vase
 
 ####trainier####
 optimizer_type: adam
 lr_type: warm_up_cos
 lr_cfg: {}
-total_step: 300000
+total_step: 200000
 val_interval: 5000
 save_interval: 1000
 train_log_step: 20

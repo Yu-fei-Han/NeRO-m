@@ -14,7 +14,7 @@ def main():
     cfg = load_cfg(flags.cfg)
     network = name2renderer[cfg['network']](cfg, training=False)
 
-    ckpt = torch.load(f'data/model/{cfg["name"]}/model.pth')
+    ckpt = torch.load(f'/openbayes/input/input0/experiments/nero/{cfg["name"]}/model.pth')
     step = ckpt['step']
     network.load_state_dict(ckpt['network_state_dict'])
     network.eval().cuda()

@@ -91,7 +91,7 @@ class Trainer:
         np.random.seed(self.cfg['random_seed'])
         random.seed(self.cfg['random_seed'])
         self.model_name=cfg['name']
-        self.model_dir=os.path.join('data/model', cfg['name'])
+        self.model_dir=os.path.join('/openbayes/input/input0/experiments/nero/', cfg['name'])
         if not os.path.exists(self.model_dir): Path(self.model_dir).mkdir(exist_ok=True, parents=True)
         self.pth_fn=os.path.join(self.model_dir,'model.pth')
         self.best_pth_fn=os.path.join(self.model_dir,'model_best.pth')
