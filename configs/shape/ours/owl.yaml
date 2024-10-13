@@ -1,8 +1,8 @@
-name: vase
+name: owl
 
 ####network#####
 network: shape
-database_name: /openbayess/input/input0/vase
+database_name: pandora/owl
 apply_occ_loss: true
 occ_loss_step: 20000
 
@@ -16,13 +16,13 @@ freeze_inv_s_step: 15000
 ####dataset#####
 train_dataset_type: dummy
 train_dataset_cfg:
-  database_name: /openbayess/input/input0/vase
+  database_name: pandora/owl
 val_set_list:
   -
     name: val
     type: dummy
     cfg:
-      database_name: /openbayess/input/input0/vase
+      database_name: pandora/owl
 
 ####trainier####
 optimizer_type: adam

@@ -287,20 +287,27 @@ class Ourdatabase(BaseDatabase):
     def __init__(self, database_name):
         super().__init__(database_name)
         _, model_name = database_name.split('/')
-        RENDER_ROOT='data/ours'
+        RENDER_ROOT='/openbayess/input/input0/'
+
         self.root=f'{RENDER_ROOT}/{model_name}'
-        self.img_path = sorted(glob.glob(f'{self.root}/image/*.png')+glob.glob(f'{self.root}/image/*.jpg'))
+        self.img_path = sorted(glob.glob(f'{self.root}/train/*.png')+glob.glob(f'{self.root}/train/*.jpg'))
         self.img_num = len(self.img_path)
         self.img_ids= [str(k) for k in range(self.img_num)]
-        self.camera_dict = np.load(os.path.join(self.root, 'cameras.npz'))
-        self.world_mats_np = [self.camera_dict['world_mat_%d' % int(idx)].astype(np.float32) for idx in range(self.img_num)]
-        self.scale_mats_np = [self.camera_dict['scale_mat_%d' % int(idx)].astype(np.float32) for idx in range(self.img_num)]
+        self.camera_dict = np.load(os.path.join(self.root, 'train_cameras_n.npz'))
+        try:
+            self.world_mats_np = [self.camera_dict['world_mat_%02d' % int(idx+1)].astype(np.float32) for idx in range(self.img_num)]
+            self.scale_mats_np = [self.camera_dict['scale_mat_%02d' % int(idx+1)].astype(np.float32) for idx in range(self.img_num)]
+        except:
+            self.world_mats_np = [self.camera_dict['world_mat_%d' % int(idx)].astype(np.float32) for idx in range(self.img_num)]
+            self.scale_mats_np = [self.camera_dict['scale_mat_%d' % int(idx)].astype(np.float32) for idx in range(self.img_num)]
         self.intrinsics_all = []
         self.pose_all = []
+
         for scale_mat, world_mat in zip(self.scale_mats_np, self.world_mats_np):
             P = world_mat @ scale_mat
             P = P[:3, :4]
             intrinsics, pose = load_K_Rt_from_P(None, P)
+
             self.intrinsics_all.append(intrinsics)
 
 
@@ -332,7 +339,76 @@ class Ourdatabase(BaseDatabase):
 
     def get_mask(self, img_id):
 
+        mask = cv2.imread(f"{self.root}/train_input_azimuth_maps/"+"{:04d}.png".format(int(img_id)),-1)[...,-1:]
+        return mask
+
+    def get_camera_center(self, img_id):
+        pose = self.pose_all[int(img_id)][:3,:]
+        rays_o = pose[ :, :3].T @ -pose[ :, 3:]
+        return rays_o
+
+class PANDORAdatabase(BaseDatabase):
+    def __init__(self, database_name):
+        super().__init__(database_name)
+        _, model_name = database_name.split('/')
+        RENDER_ROOT='/openbayes/input/input0'
+        self.resolution = 4
+        self.root=f'{RENDER_ROOT}/{model_name}'
+        self.img_path = sorted(glob.glob(f'{self.root}/train/*.png')+glob.glob(f'{self.root}/train/*.jpg'))
+        self.img_num = len(self.img_path)
+        self.img_ids= [str(k) for k in range(self.img_num)]
+        self.camera_dict = np.load(os.path.join(self.root, 'train_cameras_n.npz'))
+        try:
+            self.world_mats_np = [self.camera_dict['world_mat_%02d' % int(idx+1)].astype(np.float32) for idx in range(self.img_num)]
+            self.scale_mats_np = [self.camera_dict['scale_mat_%02d' % int(idx+1)].astype(np.float32) for idx in range(self.img_num)]
+        except:
+            self.world_mats_np = [self.camera_dict['world_mat_%d' % int(idx)].astype(np.float32) for idx in range(self.img_num)]
+            self.scale_mats_np = [self.camera_dict['scale_mat_%d' % int(idx)].astype(np.float32) for idx in range(self.img_num)]
+        self.intrinsics_all = []
+        self.pose_all = []
+
+        for scale_mat, world_mat in zip(self.scale_mats_np, self.world_mats_np):
+            P = world_mat @ scale_mat
+            P = P[:3, :4]
+            intrinsics, pose = load_K_Rt_from_P(None, P)
+            intrinsics[:2] = intrinsics[:2] / self.resolution
+            self.intrinsics_all.append(intrinsics)
+
+
+            self.pose_all.append(pose)
+
+        img = imread(self.img_path[0])
+        self.h, self.w, _ = np.shape(img)
+        self.h = self.h // self.resolution
+        self.w = self.w // self.resolution
+        del img
+
+
+    def get_image(self, img_id):
+        img = imread(self.img_path[int(img_id)])[...,:3]
+        img = cv2.resize(img, (self.w, self.h))
+        return img
+
+    def get_K(self, img_id):
+        K = self.intrinsics_all[int(img_id)][:3,:3]
+        return K.astype(np.float32)
+
+    def get_pose(self, img_id):
+        pose = self.pose_all[int(img_id)][:3,:]
+        return pose
+
+    def get_img_ids(self):
+        return self.img_ids
+
+    def get_depth(self, img_id):
+        img = self.get_image(img_id)
+        h, w, _ = img.shape
+        return np.ones([h,w],np.float32), np.ones([h, w]).astype(bool)
+
+    def get_mask(self, img_id):
+
         mask = cv2.imread(f"{self.root}/input_azimuth_maps/"+"{:04d}.png".format(int(img_id)),-1)[...,-1:]
+        mask = cv2.resize(mask, (self.w, self.h))
         return mask
     
     def get_azimuth(self, img_id):
@@ -344,7 +420,6 @@ class Ourdatabase(BaseDatabase):
         pose = self.pose_all[int(img_id)][:3,:]
         rays_o = pose[ :, :3].T @ -pose[ :, 3:]
         return rays_o
-
     
 class CustomDatabase(BaseDatabase):
     def __init__(self, database_name):
@@ -493,7 +568,8 @@ def parse_database_name(database_name:str)->BaseDatabase:
         'syn': GlossySyntheticDatabase,
         'real': GlossyRealDatabase,
         'custom': CustomDatabase,
-        'ours': Ourdatabase
+        'ours': Ourdatabase,
+        'pandora': PANDORAdatabase,
     }
     database_type = database_name.split('/')[0]
     if database_type in name2database:
