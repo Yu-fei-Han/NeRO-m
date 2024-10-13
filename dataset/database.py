@@ -355,6 +355,7 @@ class PANDORAdatabase(BaseDatabase):
         self.resolution = 4
         self.root=f'{RENDER_ROOT}/{model_name}'
         self.img_path = sorted(glob.glob(f'{self.root}/train/*.png')+glob.glob(f'{self.root}/train/*.jpg'))
+        self.mask_path = sorted(glob.glob(f'{self.root}/train_input_azimuth_maps/*.png'))
         self.img_num = len(self.img_path)
         self.img_ids= [str(k) for k in range(self.img_num)]
         self.camera_dict = np.load(os.path.join(self.root, 'train_cameras_n.npz'))
@@ -386,6 +387,11 @@ class PANDORAdatabase(BaseDatabase):
 
     def get_image(self, img_id):
         img = imread(self.img_path[int(img_id)])[...,:3]
+        import imageio,skimage
+        mask = imageio.imread(self.mask_path[int(img_id)])
+        mask = skimage.img_as_float32(mask)
+        mask = mask[...,[-1]].astype(np.float32)
+        img = img * mask
         img = cv2.resize(img, (self.w, self.h))
         return img
 

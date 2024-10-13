@@ -28,13 +28,13 @@ def main():
 
     # output geometry
     mesh = trimesh.Trimesh(vertices, triangles)
-    output_dir = Path('data/meshes')
+    output_dir = Path('/openbayes/input/input0/experiments/nero')
     output_dir.mkdir(exist_ok=True)
-    mesh.export(str(output_dir/f'{cfg["name"]}-{step}.ply'))
+    mesh.export(str(output_dir/f'{cfg["name"]}/{step}.ply'))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cfg', type=str, required=True)
+    parser.add_argument('--cfg', type=str, default='configs/shape/ours/vase.yaml')
     parser.add_argument('--resolution', type=int, default=512)
     flags = parser.parse_args()
     main()
